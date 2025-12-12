@@ -207,10 +207,12 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  reachDistance: 5
+  interactionRange: 5
   groundLayer:
     serializedVersion: 2
     m_Bits: 64
+  cameraTransform: {fileID: 654031518925476358}
+  selectionBoxPrefab: {fileID: 7616533181141702979, guid: 8e3556e9c912d2243842280509c9c38e, type: 3}
 --- !u!114 &8493769677568680382
 MonoBehaviour:
   m_ObjectHideFlags: 0
