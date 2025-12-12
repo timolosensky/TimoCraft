@@ -15,14 +15,21 @@ public class Chunk : MonoBehaviour
     [SerializeField] private float mountainScale = 0.005f; 
     [SerializeField] private float mountainHeight = 180f;  
 
-    // Konstanten für deine Welt-Schichten
+    [Header("Terrain Layers (Height 256)")]
     private const int LAYER_BEDROCK = 2;
+    
+    // Unterste Höhlen (Lava)
     private const int LAYER_LAVA_CAVES_START = 3;
-    private const int LAYER_LAVA_CAVES_END = 78;
-    private const int LAYER_DEEP_CAVES_START = 79;
-    private const int LAYER_DEEP_CAVES_END = 179;
-    private const int SEA_LEVEL = 190;
-    private const int MOUNTAIN_PEAK = 350;
+    private const int LAYER_LAVA_CAVES_END = 40; 
+    
+    // Die riesigen Kavernen
+    private const int LAYER_DEEP_CAVES_START = 41;
+    private const int LAYER_DEEP_CAVES_END = 100;
+    
+    // Oberfläche beginnt hier
+    private const int SEA_LEVEL = 110;
+    private const int MOUNTAIN_PEAK = 220;
+
 
     // --- Interne Daten ---
     private ChunkData chunkData; // Unsere Datenklasse (reines C#, kein GameObject)
@@ -48,16 +55,10 @@ public class Chunk : MonoBehaviour
 
     void Start()
     {
-        // 1. Sich beim World-Manager anmelden (falls vorhanden)
-        if (World.Instance != null)
-        {
-            World.Instance.RegisterChunk(chunkPosition, this);
-        }
-
-        // 2. Welt generieren
+       
         GenerateTerrainData();
 
-        // 3. Sichtbar machen
+        
         RegenerateMesh();
     }
 
@@ -110,7 +111,6 @@ public class Chunk : MonoBehaviour
 
     void GenerateTerrainData()
     {
-        // Absolute Position für Noise berechnen
         int3 chunkPos = new int3(chunkPosition.x, 0, chunkPosition.y) * ChunkData.ChunkWidth;
 
         for (int x = 0; x < ChunkData.ChunkWidth; x++)
@@ -120,34 +120,34 @@ public class Chunk : MonoBehaviour
                 float worldX = chunkPos.x + x;
                 float worldZ = chunkPos.z + z;
 
-                // 1. OBERFLÄCHEN-BERECHNUNG
+                // --- 1. OBERFLÄCHEN-BERECHNUNG ---
                 float biomeNoise = noise.cnoise(new float2(worldX, worldZ) * 0.002f);
                 float mountainFactor = math.remap(-1f, 1f, 0f, 1f, biomeNoise);
                 
                 float detailNoise = noise.cnoise(new float2(worldX, worldZ) * 0.01f);
                 
-                // Höhe zwischen Meer (190) und Bergspitze (350) interpolieren
+                // Neue Höhenberechnung für 256er Welt
                 float terrainHeightFloat = math.lerp(
-                    SEA_LEVEL + 5 + (detailNoise * 10), 
-                    SEA_LEVEL + (detailNoise * 20) + (mountainFactor * (MOUNTAIN_PEAK - SEA_LEVEL)), 
+                    SEA_LEVEL + 5 + (detailNoise * 8), 
+                    SEA_LEVEL + (detailNoise * 15) + (mountainFactor * (MOUNTAIN_PEAK - SEA_LEVEL)), 
                     mountainFactor * mountainFactor 
                 );
                 
                 int surfaceHeight = (int)terrainHeightFloat;
 
-                // 2. VERTIKALE SCHLEIFE (Von unten nach oben füllen)
+                // --- 2. VERTIKALE SCHLEIFE ---
                 for (int y = 0; y < ChunkData.ChunkHeight; y++)
                 {
-                    // -- SCHICHT 1: BEDROCK --
+                    // Bedrock
                     if (y < LAYER_BEDROCK)
                     {
                         chunkData.SetBlock(x, y, z, (byte)BlockType.Bedrock);
                         continue;
                     }
 
-                    // Standard-Block bestimmen (falls keine Höhle)
                     BlockType currentBlock = BlockType.Air;
 
+                    // Standard Boden
                     if (y <= surfaceHeight)
                     {
                         if (y < LAYER_DEEP_CAVES_START) currentBlock = BlockType.Stone;
@@ -156,28 +156,28 @@ public class Chunk : MonoBehaviour
                         else currentBlock = BlockType.Grass;
                     }
 
-                    // -- SCHICHT 2: LAVA HÖHLEN (Chaotisch) --
+                    // Lava Höhlen (Kleinerer Scale für kompaktere Höhlen)
                     if (y >= LAYER_LAVA_CAVES_START && y <= LAYER_LAVA_CAVES_END)
                     {
-                        float caveNoise = noise.cnoise(new float3(worldX, y * 1.2f, worldZ) * 0.06f);
-                        if (caveNoise > 0.4f) currentBlock = BlockType.Air;
+                        float caveNoise = noise.cnoise(new float3(worldX, y * 1.5f, worldZ) * 0.08f);
+                        if (caveNoise > 0.5f) currentBlock = BlockType.Air;
                     }
 
-                    // -- SCHICHT 3: TIEFENHÖHLEN (Riesig) --
+                    // Deep Dark (Große Hohlräume)
                     else if (y >= LAYER_DEEP_CAVES_START && y <= LAYER_DEEP_CAVES_END)
                     {
-                        float deepCaveNoise = noise.cnoise(new float3(worldX, y * 0.5f, worldZ) * 0.015f);
-                        if (deepCaveNoise > 0.2f) currentBlock = BlockType.Air;
+                        // Noise Scale etwas erhöht (0.02f), damit die Höhlen bei weniger Höhe trotzdem Struktur haben
+                        float deepCaveNoise = noise.cnoise(new float3(worldX, y * 0.8f, worldZ) * 0.02f);
+                        if (deepCaveNoise > 0.25f) currentBlock = BlockType.Air;
                     }
 
-                    // -- SCHICHT 4: OBERFLÄCHEN-EINGÄNGE --
+                    // Oberflächen-Eingänge
                     else if (y > LAYER_DEEP_CAVES_END && y <= surfaceHeight)
                     {
-                        float surfaceCaveNoise = noise.cnoise(new float3(worldX, y, worldZ) * 0.04f);
+                        float surfaceCaveNoise = noise.cnoise(new float3(worldX, y, worldZ) * 0.05f);
                         if (surfaceCaveNoise > 0.5f) currentBlock = BlockType.Air;
                     }
 
-                    // Block final setzen
                     chunkData.SetBlock(x, y, z, (byte)currentBlock);
                 }
             }

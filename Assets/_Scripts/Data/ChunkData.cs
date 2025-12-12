@@ -4,7 +4,7 @@ public class ChunkData
 {
     public const int ChunkWidth = 16;
     
-    public const int ChunkHeight = 512; 
+    public const int ChunkHeight = 256; 
 
     private byte[] blocks;
 
