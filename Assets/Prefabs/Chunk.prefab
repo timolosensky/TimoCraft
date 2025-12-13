@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 1714473029823071272}
   - component: {fileID: 1969552206086310101}
   - component: {fileID: 1520256990635129314}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Chunk
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -126,6 +126,3 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Chunk
   chunkPosition: {x: 0, y: 0}
-  baseHeight: 140
-  mountainScale: 0.005
-  mountainHeight: 180

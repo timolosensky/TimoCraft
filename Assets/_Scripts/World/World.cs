@@ -11,6 +11,9 @@ public class World : NetworkBehaviour
     [SerializeField] private GameObject chunkPrefab; // HIER DAS PREFAB REINZIEHEN
     [SerializeField] private int viewDistance = 5;   // Radius in Chunks (5 = 11x11 Chunks geladen)
     
+    [Header("Loot & Drops")]
+    [SerializeField] private GameObject droppedItemPrefab;
+    
     // Konstanten aus ChunkData
     private int chunkWidth = ChunkData.ChunkWidth;
     private int chunkHeight = ChunkData.ChunkHeight;
@@ -31,7 +34,7 @@ public class World : NetworkBehaviour
 
     private void Start()
     {
-        // Startet die Routine, um den Spieler zu suchen
+        ItemRegistry.Initialize(); // <--- Registry starten
         StartCoroutine(FindPlayerRoutine());
     }
 
@@ -163,10 +166,51 @@ public class World : NetworkBehaviour
 
     // --- Network Commands (Server Authoritative Building) ---
 
+    
     [Server]
     public void ServerSetBlock(Vector3 worldPosition, BlockType blockType)
     {
+        // 1. Check: Wurde etwas abgebaut? (Ziel ist Air, vorher war da was)
+        // Dazu müssten wir wissen, was vorher da war.
+        // Das ist teuer, wir müssen den Chunk VOR dem Setzen fragen.
+        
+        Chunk chunk = GetChunkAt(GetChunkCoordFromVector3(worldPosition));
+        if (chunk != null)
+        {
+            // Lokale Koordinaten berechnen (wie in RpcSetBlock)
+            Vector3Int posInt = Vector3Int.FloorToInt(worldPosition);
+            int localX = (posInt.x % chunkWidth + chunkWidth) % chunkWidth;
+            int localZ = (posInt.z % chunkWidth + chunkWidth) % chunkWidth;
+            int localY = posInt.y;
+
+            // Alten Block holen
+            // ACHTUNG: ChunkData ist private, wir brauchen eine GetBlock Methode im Chunk
+            byte oldBlockId = chunk.GetBlockByte(localX, localY, localZ); 
+            
+            // Wenn wir Luft setzen (Abbauen) UND vorher ein Block da war
+            if (blockType == BlockType.Air && oldBlockId != 0)
+            {
+                SpawnDrop(worldPosition, (BlockType)oldBlockId);
+            }
+        }
+
         RpcSetBlock(worldPosition, blockType);
+    }
+   private void SpawnDrop(Vector3 position, BlockType brokenBlock)
+    {
+        // NEU: Wir fragen die Registry
+        ItemDefinition dropItem = ItemRegistry.GetDropItem(brokenBlock);
+
+        if (dropItem != null)
+        {
+            GameObject dropObj = Instantiate(droppedItemPrefab, position + Vector3.one * 0.5f, Quaternion.identity);
+            DroppedItem droppedItemScript = dropObj.GetComponent<DroppedItem>();
+            
+            droppedItemScript.itemID = dropItem.itemID; // ID übergeben
+            droppedItemScript.amount = 1;
+            
+            NetworkServer.Spawn(dropObj);
+        }
     }
 
     [ClientRpc]

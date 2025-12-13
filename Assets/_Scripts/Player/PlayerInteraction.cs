@@ -44,11 +44,17 @@ public class PlayerInteraction : NetworkBehaviour
         HandleInputFocus();
         if (Cursor.lockState == CursorLockMode.None) return;
 
-        // --- Hinweis: Keine Tastenlogik (1-4) mehr hier, das macht PlayerInventory! ---
-
         Ray ray = new Ray(cameraTransform.position, cameraTransform.forward);
+        
+        // DEBUG: Roter Laser im Scene-View zeichnen
+        Debug.DrawRay(ray.origin, ray.direction * interactionRange, Color.red);
+
         if (Physics.Raycast(ray, out RaycastHit hit, interactionRange, groundLayer))
         {
+            // DEBUG: Grüner Ball wo wir treffen
+            Debug.DrawLine(ray.origin, hit.point, Color.green);
+            // Debug.Log($"Hit: {hit.collider.name} at {hit.point}"); // Optional spammen
+
             Vector3Int lookPos = Vector3Int.FloorToInt(hit.point - hit.normal * 0.01f);
             
             if (selectionBoxInstance != null)
@@ -57,25 +63,19 @@ public class PlayerInteraction : NetworkBehaviour
                 selectionBoxInstance.transform.position = lookPos + new Vector3(0.5f, 0.5f, 0.5f);
             }
 
-            if (Input.GetMouseButtonDown(0)) // Linksklick -> Abbauen
-            {
-                CmdModifyBlock(lookPos, BlockType.Air);
-            }
-            else if (Input.GetMouseButtonDown(1)) // Rechtsklick -> Bauen
+            // Abbauen / Bauen Logik...
+            if (Input.GetMouseButtonDown(0)) CmdModifyBlock(lookPos, BlockType.Air);
+            else if (Input.GetMouseButtonDown(1))
             {
                 Vector3Int buildPos = Vector3Int.FloorToInt(hit.point + hit.normal * 0.01f);
-                
-                // HIER IST DIE NEUE LOGIK:
                 ItemStack currentStack = playerInventory.GetSelectedItem();
 
-                // 1. Haben wir ein Item ausgewählt?
-                // 2. Ist das Item ein Block? (Werkzeuge platzieren wir nicht)
-                if (currentStack != null && currentStack.item != null && currentStack.item.isBlock)
+                if (currentStack != null && currentStack.item != null && currentStack.item.isPlaceable)
                 {
                     if (!PlayerIsInBlock(buildPos))
-                    {
-                        CmdModifyBlock(buildPos, currentStack.item.blockType);
-                    }
+                        {
+                            CmdModifyBlock(buildPos, currentStack.item.blockType);
+                        }
                 }
             }
         }
@@ -85,7 +85,6 @@ public class PlayerInteraction : NetworkBehaviour
         }
     }
     
-    // ... (Restliche Methoden wie HandleInputFocus, LockCursor, CmdModifyBlock bleiben gleich) ...
     private bool PlayerIsInBlock(Vector3Int pos)
     {
         float dist = Vector3.Distance(transform.position, pos + new Vector3(0.5f, 0.5f, 0.5f));

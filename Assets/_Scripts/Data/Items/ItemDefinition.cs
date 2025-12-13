@@ -3,9 +3,13 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "New Item", menuName = "TimoCraft/Item Definition")]
 public class ItemDefinition : ScriptableObject
 {
-    public string itemName;
-    public Sprite icon;       // Für das UI später
-    public bool isBlock;
-    public BlockType blockType; // Welcher Block wird gesetzt? (Nur relevant wenn isBlock = true)
+    [Header("General")]
+    public string itemID;      // Eindeutige ID (z.B. "stone")
+    public string displayName; // Anzeigename (z.B. "Stone Block")
+    public Sprite icon;
     public int maxStack = 64;
+
+    [Header("Block Data")]
+    public bool isPlaceable;    // Kann man das hinstellen?
+    public BlockType blockType; // Wenn ja, welche Nummer im Chunk wird es?
 }

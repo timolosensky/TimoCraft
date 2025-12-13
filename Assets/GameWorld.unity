@@ -477,6 +477,7 @@ MonoBehaviour:
   syncInterval: 0
   chunkPrefab: {fileID: 5128040578109971896, guid: 19a97b6b06a7eb04ca20ab8baf35b250, type: 3}
   viewDistance: 3
+  droppedItemPrefab: {fileID: 6710685647352280655, guid: d2dbf9cafc49e20458d00528dac2c5cd, type: 3}
 --- !u!4 &1603376625
 Transform:
   m_ObjectHideFlags: 0

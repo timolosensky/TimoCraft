@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cc9868c95a3b93949a8cc5d18792bc77, type: 3}
+  m_Name: New Block Database
+  m_EditorClassIdentifier: Assembly-CSharp::BlockDatabase
+  blocks:
+  - name: DIrt
+    blockType: 2
+    dropItem: {fileID: 11400000, guid: 93bf0b56d0218184583635919db18a57, type: 2}
+  - name: Grass
+    blockType: 3
+    dropItem: {fileID: 11400000, guid: 9354253fe9c55f44eb5abf7e3daa944b, type: 2}
+  - name: Stone
+    blockType: 1
+    dropItem: {fileID: 11400000, guid: a12d05aee62c61b42b01961adea07e7e, type: 2}
+  - name: Bedrock
+    blockType: 255
+    dropItem: {fileID: 11400000, guid: 2df2fa2a98648d849bc2eb31551d57d9, type: 2}

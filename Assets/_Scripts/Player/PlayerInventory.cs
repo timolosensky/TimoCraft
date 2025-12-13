@@ -6,34 +6,47 @@ public class PlayerInventory : NetworkBehaviour
     [Header("Settings")]
     [SerializeField] private int hotbarSize = 9;
     
+    [Header("Setup")]
+    [Tooltip("Items, die der Spieler beim Spawn erhält")]
+    [SerializeField] private ItemDefinition[] starterItems; 
+
+    // NonSerialized verhindert, dass Unity gespeicherte Daten aus dem Editor lädt
+    // und so unsere "saubere" Initialisierung überschreibt.
+    [System.NonSerialized]
     public ItemStack[] hotbarSlots;
+
     private int selectedSlotIndex = 0;
 
-    // Events für UI Updates
     public event System.Action OnInventoryChanged;
     public event System.Action<int> OnSelectionChanged;
 
-    [Header("Debug / Creative Mode")]
-    [SerializeField] private ItemDefinition[] starterItems; 
+    private void Awake()
+    {
+        // Initialisiere leere Slots
+        hotbarSlots = new ItemStack[hotbarSize];
+        for (int i = 0; i < hotbarSize; i++)
+        {
+            hotbarSlots[i] = new ItemStack(); 
+        }
+    }
 
-private void Start()
+    private void Start()
     {
         if (isLocalPlayer)
         {
-            // UI Verbindung
+            // UI verbinden
             HotbarUI ui = FindObjectOfType<HotbarUI>();
             if (ui != null) ui.Initialize(this);
             
-            // --- HIER IST DER FIX ---
-            // Wir ignorieren alles, was vllt. im Inspector in "hotbarSlots" stand
-            // und füllen strikt nach StarterItems.
+            // Starter Items hinzufügen
             if (starterItems != null)
             {
                 foreach (var item in starterItems)
                 {
                     if (item != null)
                     {
-                        AddItemToFirstFreeSlot(item, 64);
+                        // Wir fügen immer standardmäßig 64 hinzu für den Creative Mode
+                        AddItem(item, 64);
                     }
                 }
             }
@@ -42,32 +55,17 @@ private void Start()
         }
     }
 
-
-    private void Awake()
-    {
-        // Initialisiere das Array komplett leer
-        hotbarSlots = new ItemStack[hotbarSize];
-        for (int i = 0; i < hotbarSize; i++)
-        {
-            hotbarSlots[i] = new ItemStack(); // Leere Slots (kein null)
-        }
-    }
-
     private void Update()
     {
         if (!isLocalPlayer) return;
 
-        // Tasten 1-9 für Slot Auswahl
+        // Tasten 1-9
         for (int i = 0; i < hotbarSize; i++)
         {
-            // KeyCode.Alpha1 ist 49. Wir prüfen 1 bis 9.
-            if (Input.GetKeyDown(KeyCode.Alpha1 + i))
-            {
-                SelectSlot(i);
-            }
+            if (Input.GetKeyDown(KeyCode.Alpha1 + i)) SelectSlot(i);
         }
         
-        // Mausrad Scrollen (Optionales Feature)
+        // Mausrad
         float scroll = Input.GetAxis("Mouse ScrollWheel");
         if (scroll > 0f) ChangeSlot(-1);
         if (scroll < 0f) ChangeSlot(1);
@@ -94,31 +92,53 @@ private void Start()
         return hotbarSlots[selectedSlotIndex];
     }
 
-    // Hilfsfunktion zum Testen: Füllt die Leiste mit Items
-    public void AddItemToFirstFreeSlot(ItemDefinition item, int amount)
+    /// <summary>
+    /// Fügt ein Item intelligent hinzu (Stapeln + Auffüllen leerer Slots)
+    /// </summary>
+    public void AddItem(ItemDefinition item, int amount)
     {
-        // 1. Suche nach existierendem Stack desselben Typs
+        if (item == null || amount <= 0) return;
+
+        // SCHRITT 1: Versuche, existierende Stapel aufzufüllen
         for (int i = 0; i < hotbarSize; i++)
         {
-            // Prüfung auf null und item match
-            if (hotbarSlots[i].item == item)
+            // Wenn wir nichts mehr zu verteilen haben, abbrechen
+            if (amount <= 0) break;
+
+            ItemStack slot = hotbarSlots[i];
+
+            // Passt das Item? Und ist noch Platz im Stack?
+            if (slot.item == item && slot.amount < item.maxStack)
             {
-                hotbarSlots[i].amount += amount;
-                OnInventoryChanged?.Invoke();
-                return;
+                int spaceInSlot = item.maxStack - slot.amount;
+                int amountToAdd = Mathf.Min(amount, spaceInSlot);
+
+                slot.amount += amountToAdd;
+                amount -= amountToAdd;
             }
         }
+
+        // SCHRITT 2: Wenn immer noch Menge übrig ist, fülle leere Slots
+        for (int i = 0; i < hotbarSize; i++)
+        {
+            if (amount <= 0) break;
+
+            ItemStack slot = hotbarSlots[i];
+
+            // Ist der Slot leer?
+            if (slot.item == null)
+            {
+                // Wie viel passt in einen neuen Stack? (Maximal 64 oder was noch übrig ist)
+                int amountToAdd = Mathf.Min(amount, item.maxStack);
+
+                slot.item = item;
+                slot.amount = amountToAdd;
+                amount -= amountToAdd;
+            }
+        }
+
+        // Wenn amount > 0 ist, ist das Inventar voll (hier könnte man "Inventory Full" anzeigen)
         
-        // 2. Wenn nicht gefunden, suche ersten leeren Slot
-        for (int i = 0; i < hotbarSize; i++)
-        {
-            // Ein Slot ist frei, wenn item null ist
-            if (hotbarSlots[i].item == null)
-            {
-                hotbarSlots[i] = new ItemStack(item, amount);
-                OnInventoryChanged?.Invoke();
-                return;
-            }
-        }
+        OnInventoryChanged?.Invoke();
     }
 }

@@ -13,19 +13,21 @@ public class UI_ItemSlot : MonoBehaviour
     {
         if (stack != null && stack.item != null)
         {
-            // Item vorhanden
+            // Daten setzen
             iconImage.sprite = stack.item.icon;
-            iconImage.enabled = true; // Icon sichtbar machen
-            
-            // Text nur anzeigen, wenn Menge > 1 (optional, aber schöner)
             amountText.text = stack.amount.ToString();
+            
+            // SICHTBARKEIT ERZWINGEN (Fix für unsichtbare Icons)
+            iconImage.enabled = true;
+            iconImage.color = Color.white; // Alpha auf 100% zwingen
             amountText.enabled = true;
         }
         else
         {
-            // Slot ist leer
+            // Leeren Slot aufräumen
             iconImage.sprite = null;
             iconImage.enabled = false;
+            iconImage.color = Color.clear; // Komplett transparent machen
             amountText.text = "";
             amountText.enabled = false;
         }

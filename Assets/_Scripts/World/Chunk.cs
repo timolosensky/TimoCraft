@@ -1,40 +1,28 @@
 using UnityEngine;
 using System.Collections.Generic;
-using Unity.Mathematics; // WICHTIG: Stelle sicher, dass das Package installiert ist
+using Unity.Mathematics; // WICHTIG: Package muss installiert sein
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider))]
 public class Chunk : MonoBehaviour
 {
     // --- Einstellungen ---
-    [Header("Generation Settings")]
-    public Vector2Int chunkPosition; // Die Koordinate dieses Chunks (z.B. 0,0 oder 1,0)
+    [Header("Data")]
+    public Vector2Int chunkPosition; // Koordinate im Grid (z.B. 5, -2)
 
-    // --- Noise & Layer Konfiguration ---
-    [Header("Terrain Layers")]
-    [SerializeField] private int baseHeight = 140;      
-    [SerializeField] private float mountainScale = 0.005f; 
-    [SerializeField] private float mountainHeight = 180f;  
-
+    // --- Layer Konfiguration (Optimiert für 256 Höhe) ---
     [Header("Terrain Layers (Height 256)")]
     private const int LAYER_BEDROCK = 2;
-    
-    // Unterste Höhlen (Lava)
     private const int LAYER_LAVA_CAVES_START = 3;
     private const int LAYER_LAVA_CAVES_END = 40; 
-    
-    // Die riesigen Kavernen
     private const int LAYER_DEEP_CAVES_START = 41;
     private const int LAYER_DEEP_CAVES_END = 100;
-    
-    // Oberfläche beginnt hier
     private const int SEA_LEVEL = 110;
-    private const int MOUNTAIN_PEAK = 220;
-
+    private const int MOUNTAIN_PEAK = 220; 
 
     // --- Interne Daten ---
-    private ChunkData chunkData; // Unsere Datenklasse (reines C#, kein GameObject)
+    private ChunkData chunkData; // Unsere Datenklasse
 
-    // Listen für das Mesh-Building
+    // Mesh Listen (wiederverwendet für weniger Garbage Collection)
     private List<Vector3> vertices = new List<Vector3>();
     private List<int> triangles = new List<int>();
     private List<Vector3> uvs = new List<Vector3>();
@@ -49,28 +37,31 @@ public class Chunk : MonoBehaviour
         meshCollider = GetComponent<MeshCollider>();
         mesh = new Mesh();
         
-        // Hier wird die Datenklasse im Speicher erstellt
         chunkData = new ChunkData();
     }
 
     void Start()
     {
-       
-        GenerateTerrainData();
-
+        // Wir registrieren uns NICHT mehr selbst bei World.Instance.
+        // World.cs instanziiert uns und registriert uns direkt.
         
+        GenerateTerrainData();
         RegenerateMesh();
     }
 
-    // --- API für den World Manager ---
+    // --- API (Wird von World.cs aufgerufen) ---
 
     public void SetBlock(int x, int y, int z, BlockType type)
     {
-        // Speichert den Block in den Daten (noch nicht sichtbar)
         chunkData.SetBlock(x, y, z, (byte)type);
     }
 
-    // Baut das visuelle 3D-Modell neu (muss nach SetBlock aufgerufen werden, um Änderungen zu sehen)
+    // WICHTIG FÜR DROPS: Gibt die ID des Blocks zurück (z.B. um zu prüfen, was abgebaut wurde)
+    public byte GetBlockByte(int x, int y, int z)
+    {
+        return chunkData.GetBlock(x, y, z);
+    }
+
     public void RegenerateMesh()
     {
         vertices.Clear();
@@ -84,9 +75,9 @@ public class Chunk : MonoBehaviour
                 for (int z = 0; z < ChunkData.ChunkWidth; z++)
                 {
                     byte blockID = chunkData.GetBlock(x, y, z);
-                    if (blockID == 0) continue; // Luft überspringen
+                    if (blockID == 0) continue; // Luft
 
-                    // Face Culling: Nur Seiten zeichnen, die an Luft grenzen
+                    // Face Culling (Nur sichtbare Seiten zeichnen)
                     if (CheckTransparent(x + 1, y, z)) AddFace(Vector3.right, x, y, z, blockID);
                     if (CheckTransparent(x - 1, y, z)) AddFace(Vector3.left, x, y, z, blockID);
                     if (CheckTransparent(x, y + 1, z)) AddFace(Vector3.up, x, y, z, blockID);
@@ -104,10 +95,10 @@ public class Chunk : MonoBehaviour
         mesh.RecalculateNormals();
 
         meshFilter.mesh = mesh;
-        meshCollider.sharedMesh = mesh; // Physik aktualisieren
+        meshCollider.sharedMesh = mesh; // Physik Update
     }
 
-    // --- Terrain Generation Logik (Der komplexe Teil) ---
+    // --- Terrain Generation ---
 
     void GenerateTerrainData()
     {
@@ -120,13 +111,12 @@ public class Chunk : MonoBehaviour
                 float worldX = chunkPos.x + x;
                 float worldZ = chunkPos.z + z;
 
-                // --- 1. OBERFLÄCHEN-BERECHNUNG ---
+                // 1. OBERFLÄCHEN-HÖHE BERECHNEN
                 float biomeNoise = noise.cnoise(new float2(worldX, worldZ) * 0.002f);
                 float mountainFactor = math.remap(-1f, 1f, 0f, 1f, biomeNoise);
                 
                 float detailNoise = noise.cnoise(new float2(worldX, worldZ) * 0.01f);
                 
-                // Neue Höhenberechnung für 256er Welt
                 float terrainHeightFloat = math.lerp(
                     SEA_LEVEL + 5 + (detailNoise * 8), 
                     SEA_LEVEL + (detailNoise * 15) + (mountainFactor * (MOUNTAIN_PEAK - SEA_LEVEL)), 
@@ -135,10 +125,10 @@ public class Chunk : MonoBehaviour
                 
                 int surfaceHeight = (int)terrainHeightFloat;
 
-                // --- 2. VERTIKALE SCHLEIFE ---
+                // 2. VERTIKALE SCHLEIFE
                 for (int y = 0; y < ChunkData.ChunkHeight; y++)
                 {
-                    // Bedrock
+                    // Layer 1: Bedrock
                     if (y < LAYER_BEDROCK)
                     {
                         chunkData.SetBlock(x, y, z, (byte)BlockType.Bedrock);
@@ -147,7 +137,7 @@ public class Chunk : MonoBehaviour
 
                     BlockType currentBlock = BlockType.Air;
 
-                    // Standard Boden
+                    // Standard Boden füllen
                     if (y <= surfaceHeight)
                     {
                         if (y < LAYER_DEEP_CAVES_START) currentBlock = BlockType.Stone;
@@ -156,22 +146,21 @@ public class Chunk : MonoBehaviour
                         else currentBlock = BlockType.Grass;
                     }
 
-                    // Lava Höhlen (Kleinerer Scale für kompaktere Höhlen)
+                    // Layer 2: Lava Höhlen (Unten)
                     if (y >= LAYER_LAVA_CAVES_START && y <= LAYER_LAVA_CAVES_END)
                     {
                         float caveNoise = noise.cnoise(new float3(worldX, y * 1.5f, worldZ) * 0.08f);
                         if (caveNoise > 0.5f) currentBlock = BlockType.Air;
                     }
 
-                    // Deep Dark (Große Hohlräume)
+                    // Layer 3: Deep Dark (Mitte, riesige Hohlräume)
                     else if (y >= LAYER_DEEP_CAVES_START && y <= LAYER_DEEP_CAVES_END)
                     {
-                        // Noise Scale etwas erhöht (0.02f), damit die Höhlen bei weniger Höhe trotzdem Struktur haben
                         float deepCaveNoise = noise.cnoise(new float3(worldX, y * 0.8f, worldZ) * 0.02f);
                         if (deepCaveNoise > 0.25f) currentBlock = BlockType.Air;
                     }
 
-                    // Oberflächen-Eingänge
+                    // Layer 4: Oberflächen-Eingänge
                     else if (y > LAYER_DEEP_CAVES_END && y <= surfaceHeight)
                     {
                         float surfaceCaveNoise = noise.cnoise(new float3(worldX, y, worldZ) * 0.05f);
@@ -184,45 +173,29 @@ public class Chunk : MonoBehaviour
         }
     }
 
-    // --- Helper Funktionen ---
+    // --- Mesh Helper ---
 
     bool CheckTransparent(int x, int y, int z)
     {
-        if (!chunkData.IsValid(x, y, z)) return true; // Chunk-Rand immer zeichnen
+        if (!chunkData.IsValid(x, y, z)) return true; // Chunk-Grenze immer zeichnen
         return chunkData.GetBlock(x, y, z) == 0;
     }
 
     int GetTextureID(byte blockID, Vector3 direction)
     {
-        // Wir nehmen an, dein Texture Array ist so sortiert:
-        // Index 0: Erde (Dirt)
-        // Index 1: Gras Oben (Grass Top)
-        // Index 2: Stein (Stone)
-        // Index 3: Bedrock (falls vorhanden, sonst Stein)
+        // Textur Index Mapping
+        // 0: Dirt, 1: Grass Top, 2: Stone, 3: Bedrock (falls vorhanden, sonst Stone)
 
-        // --- GRAS BLOCK ---
         if (blockID == (byte)BlockType.Grass) 
         {
-            if (direction == Vector3.up)
-            {
-                return 1; // Oben = Gras Textur
-            }
-            // Alle anderen Seiten (Unten, Links, Rechts...) = Erde
-            // Das fixt dein Problem, dass die Seiten nach Stein aussehen.
-            return 0; 
+            if (direction == Vector3.up) return 1; // Oben = Grün
+            return 0; // Seite/Unten = Erde
         }
-
-        // --- ERDE ---
+        
         if (blockID == (byte)BlockType.Dirt) return 0; 
-
-        // --- STEIN ---
         if (blockID == (byte)BlockType.Stone) return 2; 
+        if (blockID == (byte)BlockType.Bedrock) return 3; // Ggf. Index 3 wenn Bedrock Textur da ist
 
-        // --- BEDROCK ---
-        // Falls du keine Bedrock Textur hast, nehmen wir Stein (2)
-        if (blockID == (byte)BlockType.Bedrock) return 2; 
-
-        // Fallback für alles Unbekannte
         return 0; 
     }
 
@@ -231,7 +204,6 @@ public class Chunk : MonoBehaviour
         int vCount = vertices.Count;
         Vector3 start = new Vector3(x, y, z);
 
-        // Quad Vertices basierend auf Richtung
         if (dir == Vector3.up) {
             vertices.Add(start + new Vector3(0, 1, 0)); vertices.Add(start + new Vector3(0, 1, 1));
             vertices.Add(start + new Vector3(1, 1, 1)); vertices.Add(start + new Vector3(1, 1, 0));
@@ -252,11 +224,9 @@ public class Chunk : MonoBehaviour
              vertices.Add(start + new Vector3(1, 1, 0)); vertices.Add(start + new Vector3(1, 0, 0));
         }
 
-        // Triangles
         triangles.Add(vCount + 0); triangles.Add(vCount + 1); triangles.Add(vCount + 2);
         triangles.Add(vCount + 0); triangles.Add(vCount + 2); triangles.Add(vCount + 3);
 
-        // UVs (Textur ID in die Z-Komponente für das Texture Array)
         int texID = GetTextureID(blockID, dir);
         uvs.Add(new Vector3(0, 0, texID)); uvs.Add(new Vector3(0, 1, texID));
         uvs.Add(new Vector3(1, 1, texID)); uvs.Add(new Vector3(1, 0, texID));
