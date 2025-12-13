@@ -6,20 +6,79 @@ public class PlayerInventory : NetworkBehaviour
     [Header("Settings")]
     [SerializeField] private int hotbarSize = 9;
     
-    // Wir synchronisieren das Inventar nicht jeden Frame,
-    // aber für komplexe Spiele nutzt man oft SyncLists. 
-    // Fürs Erste halten wir es lokal für den Client + Server Authority checks später.
-    
     public ItemStack[] hotbarSlots;
     private int selectedSlotIndex = 0;
 
-    // Event, damit das UI weiß, wann es sich updaten muss
+    // Events für UI Updates
     public event System.Action OnInventoryChanged;
     public event System.Action<int> OnSelectionChanged;
 
+    [Header("Debug / Creative Mode")]
+    [SerializeField] private ItemDefinition[] starterItems; 
+
+private void Start()
+    {
+        if (isLocalPlayer)
+        {
+            // UI Verbindung
+            HotbarUI ui = FindObjectOfType<HotbarUI>();
+            if (ui != null) ui.Initialize(this);
+            
+            // --- HIER IST DER FIX ---
+            // Wir ignorieren alles, was vllt. im Inspector in "hotbarSlots" stand
+            // und füllen strikt nach StarterItems.
+            if (starterItems != null)
+            {
+                foreach (var item in starterItems)
+                {
+                    if (item != null)
+                    {
+                        AddItemToFirstFreeSlot(item, 64);
+                    }
+                }
+            }
+            
+            SelectSlot(0);
+        }
+    }
+
+
     private void Awake()
     {
+        // Initialisiere das Array komplett leer
         hotbarSlots = new ItemStack[hotbarSize];
+        for (int i = 0; i < hotbarSize; i++)
+        {
+            hotbarSlots[i] = new ItemStack(); // Leere Slots (kein null)
+        }
+    }
+
+    private void Update()
+    {
+        if (!isLocalPlayer) return;
+
+        // Tasten 1-9 für Slot Auswahl
+        for (int i = 0; i < hotbarSize; i++)
+        {
+            // KeyCode.Alpha1 ist 49. Wir prüfen 1 bis 9.
+            if (Input.GetKeyDown(KeyCode.Alpha1 + i))
+            {
+                SelectSlot(i);
+            }
+        }
+        
+        // Mausrad Scrollen (Optionales Feature)
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        if (scroll > 0f) ChangeSlot(-1);
+        if (scroll < 0f) ChangeSlot(1);
+    }
+
+    private void ChangeSlot(int direction)
+    {
+        selectedSlotIndex -= direction;
+        if (selectedSlotIndex < 0) selectedSlotIndex = hotbarSize - 1;
+        if (selectedSlotIndex >= hotbarSize) selectedSlotIndex = 0;
+        SelectSlot(selectedSlotIndex);
     }
 
     public void SelectSlot(int index)
@@ -31,16 +90,18 @@ public class PlayerInventory : NetworkBehaviour
 
     public ItemStack GetSelectedItem()
     {
+        if (hotbarSlots == null || selectedSlotIndex >= hotbarSlots.Length) return null;
         return hotbarSlots[selectedSlotIndex];
     }
-    
-    // Einfache Methode zum Hinzufügen von Items (für Debugging / Creative Mode)
-    public void AddItem(ItemDefinition item, int amount)
+
+    // Hilfsfunktion zum Testen: Füllt die Leiste mit Items
+    public void AddItemToFirstFreeSlot(ItemDefinition item, int amount)
     {
-        // Suche existierenden Stack
+        // 1. Suche nach existierendem Stack desselben Typs
         for (int i = 0; i < hotbarSize; i++)
         {
-            if (hotbarSlots[i] != null && hotbarSlots[i].item == item)
+            // Prüfung auf null und item match
+            if (hotbarSlots[i].item == item)
             {
                 hotbarSlots[i].amount += amount;
                 OnInventoryChanged?.Invoke();
@@ -48,10 +109,11 @@ public class PlayerInventory : NetworkBehaviour
             }
         }
         
-        // Sonst erster freier Slot
+        // 2. Wenn nicht gefunden, suche ersten leeren Slot
         for (int i = 0; i < hotbarSize; i++)
         {
-            if (hotbarSlots[i] == null || hotbarSlots[i].item == null)
+            // Ein Slot ist frei, wenn item null ist
+            if (hotbarSlots[i].item == null)
             {
                 hotbarSlots[i] = new ItemStack(item, amount);
                 OnInventoryChanged?.Invoke();

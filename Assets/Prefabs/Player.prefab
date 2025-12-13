@@ -17,6 +17,7 @@ GameObject:
   - component: {fileID: 6422690660717161895}
   - component: {fileID: 6951005958726669213}
   - component: {fileID: 8493769677568680382}
+  - component: {fileID: 4290397206757227203}
   m_Layer: 7
   m_Name: Player
   m_TagString: Untagged
@@ -229,6 +230,28 @@ MonoBehaviour:
   syncMode: 0
   syncInterval: 0
   cameraMountPoint: {fileID: 654031518925476358}
+--- !u!114 &4290397206757227203
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 589092331196249201}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 740e430b53af8f74c9e8bfb882c3920f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerInventory
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  hotbarSize: 9
+  hotbarSlots: []
+  starterItems:
+  - {fileID: 11400000, guid: 93bf0b56d0218184583635919db18a57, type: 2}
+  - {fileID: 11400000, guid: 9354253fe9c55f44eb5abf7e3daa944b, type: 2}
+  - {fileID: 11400000, guid: a12d05aee62c61b42b01961adea07e7e, type: 2}
+  - {fileID: 11400000, guid: 2df2fa2a98648d849bc2eb31551d57d9, type: 2}
 --- !u!1 &5364569662067798033
 GameObject:
   m_ObjectHideFlags: 0
